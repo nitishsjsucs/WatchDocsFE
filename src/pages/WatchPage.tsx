@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getWatches } from '@/lib/storage';
 import { WatchItem } from '@/types';
+import { GeminiChat } from '@/lib/gemini';
+// import ReactMarkdown from 'react-markdown';
 
 interface ChatMessage {
   id: string;
@@ -15,6 +17,14 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// Helper function to format inline markdown
+const formatInlineMarkdown = (text: string) => {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '$1') // Remove asterisks entirely
+    .replace(/`(.*?)`/g, '<code class="bg-black/10 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
+};
+
 export default function WatchPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -22,22 +32,48 @@ export default function WatchPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [geminiChat, setGeminiChat] = useState<GeminiChat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load watch data
+  // Load watch data and initialize Gemini chat
   useEffect(() => {
     if (id) {
       const watches = getWatches();
       const foundWatch = watches.find((w: WatchItem) => w.id === id);
       if (foundWatch) {
         setWatch(foundWatch);
-        // Add welcome message
-        setMessages([{
-          id: '1',
-          role: 'assistant',
-          content: `Hello! I'm here to help you monitor and analyze ${new URL(foundWatch.url).hostname}. What would you like to know about this website?`,
-          timestamp: new Date()
-        }]);
+        
+        // Initialize Gemini chat
+        try {
+          console.log('API Key available:', !!import.meta.env.VITE_GEMINI_API_KEY);
+          const chat = new GeminiChat(foundWatch.url);
+          setGeminiChat(chat);
+          
+          // Add welcome message from Gemini
+          setMessages([{
+            id: '1',
+            role: 'assistant',
+            content: `Hello! I'm here to help you monitor and track changes on ${new URL(foundWatch.url).hostname}. 
+
+I can help you set up monitoring for various aspects of this website. To get started, could you tell me what specific content or changes you're most interested in tracking? For example:
+- Are you looking to monitor specific text content?
+- Do you want to track when new pages or posts are added?
+- Are you interested in changes to product information or pricing?
+- Or something else entirely?
+
+What would be most valuable for you to know about when it changes on this site?`,
+            timestamp: new Date()
+          }]);
+        } catch (error) {
+          console.error('Failed to initialize Gemini chat:', error);
+          // Fallback welcome message
+          setMessages([{
+            id: '1',
+            role: 'assistant',
+            content: `Hello! I'm here to help you monitor and analyze ${new URL(foundWatch.url).hostname}. What would you like to know about this website?`,
+            timestamp: new Date()
+          }]);
+        }
       } else {
         navigate('/');
       }
@@ -64,27 +100,43 @@ export default function WatchPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Replace with actual Gemini API call
-      // For now, simulate a response
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      let response: string;
+      
+      if (geminiChat) {
+        // Send message to Gemini
+        response = await geminiChat.sendMessage(inputMessage.trim());
+      } else {
+        // Fallback response if Gemini is not available
+        response = `I understand you want to track "${inputMessage.trim()}" on ${new URL(watch.url).hostname}. However, I'm currently running in demo mode. To enable full AI assistance, please add your Gemini API key to the .env file.`;
+      }
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `I understand you're asking about "${inputMessage.trim()}". This is a simulated response. In the real implementation, this would connect to Gemini LLM to provide intelligent analysis of the website at ${watch.url}.`,
+        content: response,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      // Fallback error message
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'I apologize, but I\'m having trouble connecting to the AI service right now. Please try again in a moment.',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleSendMessage();
     }
@@ -194,7 +246,79 @@ export default function WatchPage() {
                           : 'bg-white/90 backdrop-blur-sm text-foreground'
                       }`}
                     >
-                      <p className="text-sm leading-relaxed">{message.content}</p>
+                      <div className="text-sm leading-relaxed">
+                        {message.role === 'assistant' ? (
+                          <div className="space-y-2">
+                            {message.content.split('\n\n').map((paragraph, index) => {
+                              if (paragraph.trim() === '') return null;
+                              
+                              // Handle lists
+                              if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
+                                const lines = paragraph.split('\n');
+                                const listItems = lines
+                                  .filter(line => line.trim().startsWith('- '))
+                                  .map(line => line.replace(/^- /, '').trim());
+                                
+                                if (listItems.length > 0) {
+                                  return (
+                                    <ul key={index} className="list-disc list-inside space-y-1 ml-4">
+                                      {listItems.map((item, itemIndex) => (
+                                        <li key={itemIndex} className="text-sm">
+                                          <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(item) }} />
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  );
+                                }
+                              }
+                              
+                              
+                              // Handle blockquotes
+                              if (paragraph.startsWith('> ')) {
+                                return (
+                                  <blockquote key={index} className="border-l-2 border-primary/30 pl-3 italic text-sm">
+                                    <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(paragraph.replace(/^> /, '')) }} />
+                                  </blockquote>
+                                );
+                              }
+                              
+                              // Handle headings
+                              if (paragraph.startsWith('### ')) {
+                                return (
+                                  <h3 key={index} className="text-sm font-semibold mb-1">
+                                    <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(paragraph.replace(/^### /, '')) }} />
+                                  </h3>
+                                );
+                              }
+                              
+                              if (paragraph.startsWith('## ')) {
+                                return (
+                                  <h2 key={index} className="text-sm font-bold mb-2">
+                                    <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(paragraph.replace(/^## /, '')) }} />
+                                  </h2>
+                                );
+                              }
+                              
+                              if (paragraph.startsWith('# ')) {
+                                return (
+                                  <h1 key={index} className="text-base font-bold mb-2">
+                                    <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(paragraph.replace(/^# /, '')) }} />
+                                  </h1>
+                                );
+                              }
+                              
+                              // Regular paragraphs
+                              return (
+                                <p key={index} className="text-sm leading-relaxed whitespace-pre-wrap">
+                                  <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(paragraph) }} />
+                                </p>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm leading-relaxed">{message.content}</p>
+                        )}
+                      </div>
                       <p className="text-xs opacity-70 mt-2">
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
@@ -230,7 +354,7 @@ export default function WatchPage() {
                 <Input
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   placeholder="Ask about this website..."
                   className="flex-1 bg-white/90 backdrop-blur-sm"
                   disabled={isLoading}
