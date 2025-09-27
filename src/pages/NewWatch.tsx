@@ -314,8 +314,9 @@ export default function NewWatch() {
               {recentWatches.map((watch, index) => (
                  <Card 
                    key={watch.id} 
-                   className="rounded-2xl bg-white/90 backdrop-blur-sm border border-border animate-fade-in-up modern-hover"
+                   className="rounded-2xl bg-white/90 backdrop-blur-sm border border-border animate-fade-in-up modern-hover cursor-pointer transition-all duration-200 hover:scale-105"
                    style={{ animationDelay: `${index * 0.1}s` }}
+                   onClick={() => navigate(`/watch/${watch.id}/timeline`)}
                  >
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
@@ -339,16 +340,20 @@ export default function NewWatch() {
                            <Button
                              variant="ghost"
                              size="sm"
-                             onClick={() => navigate(`/watch/${watch.id}/live`)}
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               navigate(`/watch/${watch.id}/live`);
+                             }}
                              className="h-8 px-2 text-xs sm:text-sm bg-white/90 backdrop-blur-sm hover:bg-white/95"
                            >
-                             Open
+                             Live
                            </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={(e) => e.stopPropagation()}
                                 className="h-8 w-8 sm:h-10 sm:w-10 p-0 text-destructive hover:text-destructive bg-white/90 backdrop-blur-sm hover:bg-white/95"
                               >
                                 <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
