@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import NewWatch from '@/pages/NewWatch';
 import WatchDetail from '@/pages/WatchDetail';
+import WatchPage from '@/pages/WatchPage';
 
 export const router = createBrowserRouter([
   {
@@ -21,5 +22,9 @@ export const router = createBrowserRouter([
         element: <WatchDetail />,
       },
     ],
+  },
+  {
+    path: '/watch/:id/live',
+    element: <WatchPage />,
   },
 ]);
