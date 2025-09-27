@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, ArrowLeft, ExternalLink, MessageSquare, Bot, User } from 'lucide-react';
+import { Send, ArrowLeft, ExternalLink, MessageSquare, Bot, User, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { getWatches } from '@/lib/storage';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getWatches, updateWatch } from '@/lib/storage';
 import { WatchItem } from '@/types';
 import { GeminiChat } from '@/lib/gemini';
 // import ReactMarkdown from 'react-markdown';
@@ -33,6 +34,8 @@ export default function WatchPage() {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [geminiChat, setGeminiChat] = useState<GeminiChat | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [alertLevel, setAlertLevel] = useState<'critical' | 'high' | 'low'>('high');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load watch data and initialize Gemini chat
@@ -45,7 +48,7 @@ export default function WatchPage() {
         
         // Initialize Gemini chat
         try {
-          console.log('API Key available:', !!import.meta.env.VITE_GEMINI_API_KEY);
+          console.log('API Key available:', !!(import.meta as any).env?.VITE_GEMINI_API_KEY);
           const chat = new GeminiChat(foundWatch.url);
           setGeminiChat(chat);
           
@@ -142,6 +145,15 @@ What would be most valuable for you to know about when it changes on this site?`
     }
   };
 
+  const handleCreateWatchDoc = () => {
+    if (watch) {
+      updateWatch(watch.id, {
+        notes: `Alert Level: ${alertLevel}`,
+      });
+      navigate('/');
+    }
+  };
+
   if (!watch) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -210,26 +222,110 @@ What would be most valuable for you to know about when it changes on this site?`
 
       {/* Main Content */}
       <div className="relative z-10 flex h-[calc(100vh-80px)]">
-        {/* Left Side - Chat */}
+        {/* Left Side - Chat or Settings */}
         <div className="w-1/2 border-r border-border/50 bg-white/5 backdrop-blur-sm">
           <div className="h-full flex flex-col">
-            {/* Chat Header */}
+            {/* Header */}
             <div className="p-4 sm:p-6 border-b border-border/50 bg-white/10 backdrop-blur-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <MessageSquare className="h-5 w-5 text-primary" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    {showSettings ? <Settings className="h-5 w-5 text-primary" /> : <MessageSquare className="h-5 w-5 text-primary" />}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">
+                      {showSettings ? 'Settings' : 'AI Assistant'}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {showSettings ? 'Configure your watch settings' : 'Ask me anything about this website'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">AI Assistant</h2>
-                  <p className="text-sm text-muted-foreground">Ask me anything about this website</p>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                >
+                  {showSettings ? <MessageSquare className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
 
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-4 sm:p-6">
-              <div className="space-y-4">
-                {messages.map((message) => (
+            {/* Content */}
+            {showSettings ? (
+              <div className="flex-1 flex flex-col p-4 sm:p-6">
+                <div className="space-y-6 flex-1">
+                  {/* Watch Title */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Watch Title</label>
+                    <Input
+                      value={watch?.url ? new URL(watch.url).hostname : ''}
+                      readOnly
+                      className="bg-white/90 backdrop-blur-sm"
+                    />
+                  </div>
+
+                  {/* Current URL */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Current URL</label>
+                    <Input
+                      value={watch?.url || ''}
+                      readOnly
+                      className="bg-white/90 backdrop-blur-sm"
+                    />
+                  </div>
+
+                  {/* Username */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Username</label>
+                    <Input
+                      placeholder="Enter username for this website"
+                      className="bg-white/90 backdrop-blur-sm"
+                    />
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Password</label>
+                    <Input
+                      type="password"
+                      placeholder="Enter password for this website"
+                      className="bg-white/90 backdrop-blur-sm"
+                    />
+                  </div>
+
+                  {/* Alert Level */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Alert Level</label>
+                    <Select value={alertLevel} onValueChange={(value: 'critical' | 'high' | 'low') => setAlertLevel(value)}>
+                      <SelectTrigger className="bg-white/90 backdrop-blur-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                        <SelectItem value="critical">Critical</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Create Watch Doc Button - Fixed at bottom */}
+                <div className="mt-6">
+                  <Button
+                    onClick={handleCreateWatchDoc}
+                    className="w-full bg-black text-white hover:bg-gray-800"
+                    size="lg"
+                  >
+                    Create Watch Doc
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <ScrollArea className="flex-1 p-4 sm:p-6">
+                <div className="space-y-4">
+                  {messages.map((message) => (
                   <div
                     key={message.id}
                     className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -344,30 +440,33 @@ What would be most valuable for you to know about when it changes on this site?`
                     </div>
                   </div>
                 )}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
+            )}
 
-            {/* Input */}
-            <div className="p-4 sm:p-6 border-t border-border/50 bg-white/10 backdrop-blur-sm">
-              <div className="flex gap-3">
-                <Input
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Ask about this website..."
-                  className="flex-1 bg-white/90 backdrop-blur-sm"
-                  disabled={isLoading}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isLoading}
-                  className="bg-white/90 backdrop-blur-sm hover:bg-white/95"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+            {/* Input - Only show when not in settings */}
+            {!showSettings && (
+              <div className="p-4 sm:p-6 border-t border-border/50 bg-white/10 backdrop-blur-sm">
+                <div className="flex gap-3">
+                  <Input
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Ask about this website..."
+                    className="flex-1 bg-white/90 backdrop-blur-sm"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!inputMessage.trim() || isLoading}
+                    className="bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
