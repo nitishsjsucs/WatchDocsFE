@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Play, AlertCircle, CheckCircle, ExternalLink, Link2, ShieldAlert, Clock, Trash2, Plus, Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield, Zap, Settings } from 'lucide-react';
+import { Eye, Play, AlertCircle, CheckCircle, ExternalLink, Link2, ShieldAlert, Clock, Trash2, Plus, Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield, Zap, Settings, MessageSquare, Bot, User, Send } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,11 @@ export default function NewWatch() {
   const [frequency, setFrequency] = useState('daily');
   const [voice, setVoice] = useState('Morning dad');
   const [detailLevel, setDetailLevel] = useState('medium');
+  const [inputMode, setInputMode] = useState<'url' | 'chat'>('url');
+  const [chatMessages, setChatMessages] = useState<Array<{id: string, role: 'user' | 'assistant', content: string}>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatSectionRef = useRef<HTMLDivElement>(null);
+  const previewSectionRef = useRef<HTMLDivElement>(null);
 
   // Load recent watches
   useEffect(() => {
@@ -37,6 +42,30 @@ export default function NewWatch() {
     };
     loadWatches();
   }, []);
+
+  // Scroll to chat when switching to chat mode
+  useEffect(() => {
+    if (inputMode === 'chat' && chatSectionRef.current) {
+      setTimeout(() => {
+        chatSectionRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 100);
+    }
+  }, [inputMode]);
+
+  // Scroll to preview when it appears
+  useEffect(() => {
+    if (inputMode === 'url' && url.trim() && previewSectionRef.current) {
+      setTimeout(() => {
+        previewSectionRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 200);
+    }
+  }, [url, inputMode]);
 
   // Validate URL on change
   useEffect(() => {
@@ -92,6 +121,29 @@ export default function NewWatch() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim()) return;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: chatInput.trim()
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+
+    // Simulate AI response
+    setTimeout(() => {
+      const assistantMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: `I understand you're interested in monitoring "${chatInput.trim()}". Let me help you find relevant websites to track. Based on your interest, here are some suggestions:\n\n1. Industry news sites\n2. Official company pages\n3. Documentation sites\n4. Product pages\n\nWould you like me to search for specific websites related to this topic?`
+      };
+      setChatMessages(prev => [...prev, assistantMessage]);
+    }, 1000);
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -244,7 +296,7 @@ export default function NewWatch() {
             Watch Docs
           </h1>
           <p className="text-muted-foreground text-lg sm:text-xl lg:text-2xl leading-relaxed max-w-2xl mx-auto mb-4">
-            Monitor web page changes with intelligent tracking and real-time notifications.
+            Monitor web page changes with intelligent tracking.
           </p>
           <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
@@ -266,27 +318,139 @@ export default function NewWatch() {
         <div className="flex flex-col lg:flex-row items-start justify-center gap-12 lg:gap-16 max-w-7xl mx-auto w-full">
           {/* Left Section - Form */}
           <div className={`w-full animate-fade-in-up transition-all duration-500 ${url.trim() ? 'lg:max-w-2xl' : 'lg:max-w-3xl mx-auto text-center'}`}>
-            {/* URL Input Section */}
-            <div className="space-y-6 mb-12">
-              <div className="relative max-w-4xl mx-auto">
-                <Link2 className="absolute left-6 top-1/2 transform -translate-y-1/2 h-6 w-6 text-muted-foreground z-10" />
-                 <Input
-                   id="url"
-                   type="url"
-                   placeholder="Enter any website URL (e.g., https://docs.example.com)"
-                   value={url}
-                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)}
-                   className={`pl-16 pr-6 h-16 sm:h-18 lg:h-20 text-lg sm:text-xl lg:text-2xl bg-white/95 backdrop-blur-sm border-2 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl focus:shadow-2xl placeholder:text-gray-400 text-muted-foreground ${urlError ? 'border-destructive focus-visible:ring-destructive' : 'border-border focus-visible:ring-primary focus:border-primary/50'}`}
-                   aria-describedby={urlError ? 'url-error' : undefined}
-                   aria-invalid={!!urlError}
-                 />
-                 {url.trim() && (
-                   <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
-                     {getStatusIcon()}
-                   </div>
-                 )}
+            {/* Input Mode Toggle */}
+            <div className="flex items-center justify-center mb-8">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-2 border-2 border-border shadow-lg">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={inputMode === 'url' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setInputMode('url')}
+                    className={`px-6 py-3 rounded-xl transition-all duration-300 ${
+                      inputMode === 'url' 
+                        ? 'bg-black text-white shadow-lg' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Link2 className="h-4 w-4 mr-2" />
+                    Direct URL
+                  </Button>
+                  <Button
+                    variant={inputMode === 'chat' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setInputMode('chat')}
+                    className={`px-6 py-3 rounded-xl transition-all duration-300 ${
+                      inputMode === 'chat' 
+                        ? 'bg-black text-white shadow-lg' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    AI Chat
+                  </Button>
+                </div>
               </div>
-              {urlError && (
+            </div>
+
+            {/* Input Section - URL or Chat */}
+            <div ref={chatSectionRef} className="space-y-6 mb-12">
+              {inputMode === 'url' ? (
+                <div className="relative max-w-4xl mx-auto">
+                  <Link2 className="absolute left-6 top-1/2 transform -translate-y-1/2 h-6 w-6 text-muted-foreground z-10" />
+                   <Input
+                     id="url"
+                     type="url"
+                     placeholder="Enter any website URL (e.g., https://docs.example.com)"
+                     value={url}
+                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)}
+                     className={`pl-16 pr-6 h-16 sm:h-18 lg:h-20 text-lg sm:text-xl lg:text-2xl bg-white/95 backdrop-blur-sm border-2 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl focus:shadow-2xl placeholder:text-gray-400 text-muted-foreground ${urlError ? 'border-destructive focus-visible:ring-destructive' : 'border-border focus-visible:ring-primary focus:border-primary/50'}`}
+                     aria-describedby={urlError ? 'url-error' : undefined}
+                     aria-invalid={!!urlError}
+                   />
+                   {url.trim() && (
+                     <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
+                       {getStatusIcon()}
+                     </div>
+                   )}
+                </div>
+              ) : (
+                <div className="max-w-4xl mx-auto">
+                  <Card className="bg-white/95 backdrop-blur-sm border-2 border-border shadow-lg rounded-2xl overflow-hidden">
+                    <CardContent className="p-0">
+                      {/* Chat Header */}
+                      <div className="p-4 border-b border-border/50 bg-primary/5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                            <Bot className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-foreground">AI Assistant</h3>
+                            <p className="text-xs text-muted-foreground">Tell me what you're interested in monitoring</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Chat Messages */}
+                      <div className="h-64 overflow-y-auto p-4 space-y-4">
+                        {chatMessages.length === 0 ? (
+                          <div className="text-center text-muted-foreground py-8">
+                            <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>Start a conversation about what you'd like to monitor</p>
+                          </div>
+                        ) : (
+                          chatMessages.map((message) => (
+                            <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              {message.role === 'assistant' && (
+                                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                                  <Bot className="h-4 w-4 text-primary" />
+                                </div>
+                              )}
+                              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                                message.role === 'user'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-gray-100 text-foreground'
+                              }`}>
+                                <p className="text-sm">{message.content}</p>
+                              </div>
+                              {message.role === 'user' && (
+                                <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      
+                      {/* Chat Input */}
+                      <div className="p-4 border-t border-border/50">
+                        <div className="flex gap-3">
+                          <Input
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            placeholder="Describe what you want to monitor..."
+                            className="flex-1 bg-white border-2 border-border rounded-xl"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && chatInput.trim()) {
+                                handleChatSend();
+                              }
+                            }}
+                          />
+                          <Button
+                            onClick={handleChatSend}
+                            disabled={!chatInput.trim()}
+                            className="bg-black text-white hover:bg-gray-800 rounded-xl"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              
+              {inputMode === 'url' && urlError && (
                 <Alert variant="destructive" className="animate-slide-down max-w-4xl mx-auto">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription id="url-error">
@@ -298,30 +462,48 @@ export default function NewWatch() {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-12 max-w-2xl mx-auto">
-               <Button
-                 onClick={handlePreview}
-                 disabled={!isHttpUrl(url.trim()) || isLoading}
-                 variant="outline"
-                 size="lg"
-                 className="flex-1 h-16 sm:h-18 text-lg font-medium bg-white/95 backdrop-blur-sm hover:bg-white border-2 hover:border-primary/30 transition-all duration-300 hover:shadow-lg"
-               >
-                 <Eye className="h-5 w-5 mr-3" />
-                 Preview Website
-               </Button>
-               <Button
-                 onClick={handleStartWatching}
-                 disabled={!isHttpUrl(url.trim())}
-                 size="lg"
-                 className="flex-1 h-16 sm:h-18 text-lg font-medium bg-black hover:bg-black/90 text-white transition-all duration-300 hover:shadow-lg hover:scale-105"
-               >
-                 <Play className="h-5 w-5 mr-3" />
-                 Start Monitoring
-               </Button>
+               {inputMode === 'url' ? (
+                 <>
+                   <Button
+                     onClick={handlePreview}
+                     disabled={!isHttpUrl(url.trim()) || isLoading}
+                     variant="outline"
+                     size="lg"
+                     className="flex-1 h-16 sm:h-18 text-lg font-medium bg-white/95 backdrop-blur-sm hover:bg-white border-2 hover:border-primary/30 transition-all duration-300 hover:shadow-lg"
+                   >
+                     <Eye className="h-5 w-5 mr-3" />
+                     Preview Website
+                   </Button>
+                   <Button
+                     onClick={handleStartWatching}
+                     disabled={!isHttpUrl(url.trim())}
+                     size="lg"
+                     className="flex-1 h-16 sm:h-18 text-lg font-medium bg-black hover:bg-black/90 text-white transition-all duration-300 hover:shadow-lg hover:scale-105"
+                   >
+                     <Play className="h-5 w-5 mr-3" />
+                     Start Monitoring
+                   </Button>
+                 </>
+               ) : (
+                 <Button
+                   onClick={() => {
+                     toast({
+                       title: "AI Search",
+                       description: "AI-powered website discovery feature coming soon!",
+                     });
+                   }}
+                   size="lg"
+                   className="w-full h-16 sm:h-18 text-lg font-medium bg-black hover:bg-black/90 text-white transition-all duration-300 hover:shadow-lg hover:scale-105"
+                 >
+                   <Bot className="h-5 w-5 mr-3" />
+                   Find Websites with AI
+                 </Button>
+               )}
             </div>
 
             {/* Status and Help Text */}
             <div className="space-y-4 text-center">
-              {url.trim() && (
+              {inputMode === 'url' && url.trim() && (
                 <div className="flex items-center justify-center gap-2 text-sm">
                   {getStatusIcon()}
                   <span className={`font-medium ${previewStatus === 'valid' ? 'text-green-600' : previewStatus === 'invalid' ? 'text-red-600' : 'text-muted-foreground'}`}>
@@ -329,12 +511,17 @@ export default function NewWatch() {
                   </span>
                 </div>
               )}
+              {inputMode === 'chat' && (
+                <div className="text-sm text-muted-foreground">
+                  <p>💡 <strong>Tip:</strong> Describe your interests and I'll help you find relevant websites to monitor</p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Section - Preview */}
-          {url.trim() && (
-            <div className="w-full lg:max-w-3xl animate-slide-in-right transition-all duration-700">
+          {inputMode === 'url' && url.trim() && (
+            <div ref={previewSectionRef} className="w-full lg:max-w-3xl animate-slide-in-right transition-all duration-700">
               <Card className="rounded-3xl bg-white/95 backdrop-blur-sm border-2 border-border shadow-xl modern-hover">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
