@@ -7,6 +7,39 @@ export type LatestScan = {
   scan_date: string;
 };
 
+export type ScanHistory = {
+  id: number;
+  date: string;
+  changes: boolean;
+  change_level: string;
+  change_summary: string;
+  current_summary: string;
+  raw_content_preview?: string;
+  changes_detail: {
+    added: string[];
+    removed: string[];
+    modified: string[];
+  };
+};
+
+export type WatchTimelineResponse = {
+  document: {
+    id: number;
+    title: string;
+    desc: string;
+    url: string;
+    status: string;
+    category: string;
+    created_date: string;
+    scan_count: number;
+    latest_scan: LatestScan & {
+      current_summary: string;
+    };
+    scan_history: ScanHistory[];
+  };
+  total_scans: number;
+};
+
 export type WatchItem = {
   id: number;
   title: string;

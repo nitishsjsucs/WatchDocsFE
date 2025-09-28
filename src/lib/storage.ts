@@ -68,6 +68,20 @@ export async function getWatchById(id: number): Promise<WatchItem | null> {
   }
 }
 
+export async function getWatchTimeline(id: number) {
+  try {
+    // The timeline data is included in the document endpoint response
+    const response = await fetch(`${API_BASE_URL}/documents/${id}/`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch watch timeline:', error);
+    return null;
+  }
+}
+
 // Legacy functions for compatibility - these now just return dummy data or throw errors
 export function saveWatches(watches: WatchItem[]): void {
   console.warn('saveWatches is deprecated - data is now managed by the API');

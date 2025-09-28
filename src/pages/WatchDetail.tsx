@@ -1,47 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Clock, Calendar, AlertCircle, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getWatchById } from '@/lib/storage';
-import { getDomainFromUrl } from '@/lib/validation';
 import { WatchItem } from '@/types';
 
 export default function WatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const [watch, setWatch] = useState<WatchItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadWatch = async () => {
-      // Check if this is the setup flow with query parameters
-      const urlParams = new URLSearchParams(location.search);
-      const setupUrl = urlParams.get('url');
-      const setupTitle = urlParams.get('title');
-      
-      if (setupUrl && (location.pathname === '/watch/setup')) {
-        // Setup flow - create a mock watch object for display
-        const mockWatch: WatchItem = {
-          id: 0, // Temporary ID for setup
-          title: setupTitle || getDomainFromUrl(setupUrl),
-          desc: '',
-          url: setupUrl,
-          status: 'setup',
-          created_date: new Date().toISOString(),
-          latest_scan: {
-            id: 0,
-            changes: false,
-            change_level: 'none',
-            change_summary: '',
-            current_summary: '',
-            scan_date: new Date().toISOString()
-          }
-        };
-        setWatch(mockWatch);
-      } else if (id) {
-        // Existing flow - load watch by ID
+      if (id) {
         const numId = parseInt(id, 10);
         if (!isNaN(numId)) {
           const foundWatch = await getWatchById(numId);
@@ -51,7 +24,7 @@ export default function WatchDetail() {
       setLoading(false);
     };
     loadWatch();
-  }, [id, location.search, location.pathname]);
+  }, [id]);
 
   if (loading) {
     return (
@@ -210,47 +183,6 @@ export default function WatchDetail() {
               )}
             </CardContent>
           </Card>
-        )}
-
-        {/* Action Buttons */}
-        {watch.status === 'setup' ? (
-          <div className="flex gap-4 mb-6">
-            <Button 
-              onClick={() => {
-                // TODO: Navigate to configuration/settings
-                console.log('Configure monitoring settings');
-              }}
-              variant="outline"
-              className="flex-1"
-            >
-              Configure Settings
-            </Button>
-            <Button 
-              onClick={() => {
-                // TODO: Actually start monitoring (make API call here)
-                console.log('Start monitoring for:', watch.url);
-              }}
-              className="flex-1"
-            >
-              Start Monitoring
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-4 mb-6">
-            <Button 
-              onClick={() => navigate(`/watch/${watch.id}/timeline`)}
-              variant="outline"
-              className="flex-1"
-            >
-              View Timeline
-            </Button>
-            <Button 
-              onClick={() => navigate(`/watch/${watch.id}/live`)}
-              className="flex-1"
-            >
-              Live View
-            </Button>
-          </div>
         )}
 
         {/* Preview Card */}
