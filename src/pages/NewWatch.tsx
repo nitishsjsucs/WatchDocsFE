@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Play, AlertCircle, CheckCircle, ExternalLink, Link2, ShieldAlert, Clock, Trash2, Plus, Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield } from 'lucide-react';
+import { Eye, Play, AlertCircle, CheckCircle, ExternalLink, Link2, ShieldAlert, Clock, Trash2, Plus, Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield, Zap, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { isHttpUrl, getDomainFromUrl } from '@/lib/validation';
 import { addWatch, getWatches, deleteWatch } from '@/lib/storage';
 import { WatchItem, PreviewStatus } from '@/types';
@@ -23,6 +24,10 @@ export default function NewWatch() {
   const [isLoading, setIsLoading] = useState(false);
   const [urlError, setUrlError] = useState('');
   const [recentWatches, setRecentWatches] = useState<WatchItem[]>([]);
+  const [showSummarySettings, setShowSummarySettings] = useState(false);
+  const [frequency, setFrequency] = useState('daily');
+  const [voice, setVoice] = useState('Morning dad');
+  const [detailLevel, setDetailLevel] = useState('medium');
 
   // Load recent watches
   useEffect(() => {
@@ -214,6 +219,18 @@ export default function NewWatch() {
       
       {/* Hero Section */}
       <div className="relative min-h-[80vh] p-4 sm:p-6 lg:p-8 z-10 flex flex-col justify-center">
+        {/* Summary Settings - Top Left */}
+        <div className="absolute top-2 sm:top-3 lg:top-4 left-2 sm:left-3 lg:left-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSummarySettings(!showSummarySettings)}
+            className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-primary/10 rounded-xl flex items-center justify-center animate-scale-in hover:bg-primary/20 hover:ring-2 hover:ring-black/20 hover:ring-offset-2 transition-all duration-300 group"
+          >
+            <Zap className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-primary group-hover:scale-110 transition-transform duration-300" />
+          </Button>
+        </div>
+
         {/* Account Section - Top Right */}
         <div className="absolute top-2 sm:top-3 lg:top-4 right-2 sm:right-3 lg:right-4">
           <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-primary/10 rounded-xl flex items-center justify-center animate-scale-in">
@@ -222,7 +239,7 @@ export default function NewWatch() {
         </div>
 
         {/* Professional Header Section */}
-        <div className="text-center mb-16 animate-fade-in-up">
+        <div className="text-center mb-16 animate-fade-in-up pt-16">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text">
             Watch Docs
           </h1>
@@ -256,10 +273,10 @@ export default function NewWatch() {
                  <Input
                    id="url"
                    type="url"
-                   placeholder="Enter any website URL (e.g., https://docs.example.com, https://news.site.com)"
+                   placeholder="Enter any website URL (e.g., https://docs.example.com)"
                    value={url}
                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)}
-                   className={`pl-16 pr-6 h-16 sm:h-18 lg:h-20 text-lg sm:text-xl lg:text-2xl bg-white/95 backdrop-blur-sm border-2 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl focus:shadow-2xl placeholder:text-muted-foreground/50 ${urlError ? 'border-destructive focus-visible:ring-destructive' : 'border-border focus-visible:ring-primary focus:border-primary/50'}`}
+                   className={`pl-16 pr-6 h-16 sm:h-18 lg:h-20 text-lg sm:text-xl lg:text-2xl bg-white/95 backdrop-blur-sm border-2 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl focus:shadow-2xl placeholder:text-gray-400 text-muted-foreground ${urlError ? 'border-destructive focus-visible:ring-destructive' : 'border-border focus-visible:ring-primary focus:border-primary/50'}`}
                    aria-describedby={urlError ? 'url-error' : undefined}
                    aria-invalid={!!urlError}
                  />
@@ -312,9 +329,6 @@ export default function NewWatch() {
                   </span>
                 </div>
               )}
-              <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-                Enter any website URL to start monitoring. We'll track changes and notify you when content updates.
-              </p>
             </div>
           </div>
 
@@ -384,8 +398,121 @@ export default function NewWatch() {
         </div>
       </div>
 
+      {/* Summary Settings Modal */}
+      {showSummarySettings && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg bg-white border-2 border-border shadow-2xl rounded-3xl overflow-hidden">
+            <CardHeader className="pb-6 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-border/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Zap className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold text-foreground">
+                    Summary Call
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Configure your intelligent summary call settings
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-8">
+              {/* Grid Layout for Form Elements */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* Frequency Card */}
+                <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-6 border border-primary/20 hover:shadow-lg transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-primary" />
+                    </div>
+                    <label className="text-sm font-semibold text-foreground">Frequency</label>
+                  </div>
+                  <Select value={frequency} onValueChange={(value) => setFrequency(value)}>
+                    <SelectTrigger className="h-12 bg-white border-2 border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-border shadow-xl rounded-xl">
+                      <SelectItem value="daily" className="hover:bg-primary/10">Daily</SelectItem>
+                      <SelectItem value="weekend" className="hover:bg-primary/10">Every Weekend</SelectItem>
+                      <SelectItem value="monthly" className="hover:bg-primary/10">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Voice Card */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200 hover:shadow-lg transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-blue-200 rounded-lg flex items-center justify-center">
+                      <Activity className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <label className="text-sm font-semibold text-foreground">Voice</label>
+                  </div>
+                  <Select value={voice} onValueChange={(value) => setVoice(value)}>
+                    <SelectTrigger className="h-12 bg-white border-2 border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-border shadow-xl rounded-xl">
+                      <SelectItem value="Morning dad" className="hover:bg-primary/10">Morning dad</SelectItem>
+                      <SelectItem value="Lunch dad" className="hover:bg-primary/10">Lunch dad</SelectItem>
+                      <SelectItem value="Dinner dad" className="hover:bg-primary/10">Dinner dad</SelectItem>
+                      <SelectItem value="Boomer dad" className="hover:bg-primary/10">Boomer dad</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Detail Level - Full Width Card */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200 hover:shadow-lg transition-all duration-300 mb-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-green-200 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </div>
+                  <label className="text-sm font-semibold text-foreground">Detail Level</label>
+                </div>
+                <div className="max-w-md">
+                  <Select value={detailLevel} onValueChange={(value) => setDetailLevel(value)}>
+                    <SelectTrigger className="h-12 bg-white border-2 border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-border shadow-xl rounded-xl">
+                      <SelectItem value="low" className="hover:bg-primary/10">Low</SelectItem>
+                      <SelectItem value="medium" className="hover:bg-primary/10">Medium</SelectItem>
+                      <SelectItem value="high" className="hover:bg-primary/10">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 pt-6">
+                <Button
+                  onClick={() => setShowSummarySettings(false)}
+                  variant="outline"
+                  className="flex-1 h-12 bg-white border-2 border-border hover:bg-gray-50 hover:shadow-lg transition-all duration-300 rounded-xl font-semibold"
+                >
+                  Save
+                </Button>
+                <Button
+                  onClick={() => {
+                    // TODO: Implement Vapi call
+                    toast({
+                      title: "Call Now",
+                      description: "Summary call feature will be implemented soon",
+                    });
+                  }}
+                  className="flex-1 h-12 bg-black text-white hover:bg-gray-800 hover:shadow-xl transition-all duration-300 rounded-xl font-semibold hover:scale-105"
+                >
+                  Call Now
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Recent Watch Docs Section - Moved higher and improved */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-40 pb-16 relative z-10">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Your Watch Dashboard</h2>
