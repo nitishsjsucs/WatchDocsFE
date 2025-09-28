@@ -29,6 +29,10 @@ export const router = createBrowserRouter([
     element: <WatchPage />,
   },
   {
+    path: '/watch/preview/live',
+    element: <WatchPage />,
+  },
+  {
     path: '/watch/:id/timeline',
     element: <WatchTimeline />,
   },

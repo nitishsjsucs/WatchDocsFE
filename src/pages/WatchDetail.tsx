@@ -1,23 +1,57 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Clock, Calendar, AlertCircle } from 'lucide-react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, ExternalLink, Clock, Calendar, AlertCircle, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { getWatches } from '@/lib/storage';
+import { getWatchById } from '@/lib/storage';
+import { getDomainFromUrl } from '@/lib/validation';
 import { WatchItem } from '@/types';
 
 export default function WatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [watch, setWatch] = useState<WatchItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const watches = getWatches();
-    const foundWatch = watches.find((w: WatchItem) => w.id === id);
-    setWatch(foundWatch || null);
-    setLoading(false);
-  }, [id]);
+    const loadWatch = async () => {
+      // Check if this is the setup flow with query parameters
+      const urlParams = new URLSearchParams(location.search);
+      const setupUrl = urlParams.get('url');
+      const setupTitle = urlParams.get('title');
+      
+      if (setupUrl && (location.pathname === '/watch/setup')) {
+        // Setup flow - create a mock watch object for display
+        const mockWatch: WatchItem = {
+          id: 0, // Temporary ID for setup
+          title: setupTitle || getDomainFromUrl(setupUrl),
+          desc: '',
+          url: setupUrl,
+          status: 'setup',
+          created_date: new Date().toISOString(),
+          latest_scan: {
+            id: 0,
+            changes: false,
+            change_level: 'none',
+            change_summary: '',
+            current_summary: '',
+            scan_date: new Date().toISOString()
+          }
+        };
+        setWatch(mockWatch);
+      } else if (id) {
+        // Existing flow - load watch by ID
+        const numId = parseInt(id, 10);
+        if (!isNaN(numId)) {
+          const foundWatch = await getWatchById(numId);
+          setWatch(foundWatch);
+        }
+      }
+      setLoading(false);
+    };
+    loadWatch();
+  }, [id, location.search, location.pathname]);
 
   if (loading) {
     return (
@@ -112,33 +146,111 @@ export default function WatchDetail() {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground">Created</span>
               </div>
-              <p className="text-sm text-foreground">{formatDate(watch.createdAt)}</p>
+              <p className="text-sm text-foreground">{formatDate(watch.created_date)}</p>
             </CardContent>
           </Card>
           
-          {watch.lastCheckedAt && (
+          {watch.latest_scan && (
             <Card className="rounded-xl bg-card border border-border animate-fade-in-up modern-hover">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground">Last Checked</span>
+                  <span className="text-xs font-medium text-muted-foreground">Last Scanned</span>
                 </div>
-                <p className="text-sm text-foreground">{formatDate(watch.lastCheckedAt)}</p>
+                <p className="text-sm text-foreground">{formatDate(watch.latest_scan.scan_date)}</p>
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* Notes */}
-        {watch.notes && (
+        {/* Description */}
+        {watch.desc && (
           <Card className="mb-6 rounded-xl bg-card border border-border animate-fade-in-up modern-hover">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Notes</CardTitle>
+              <CardTitle className="text-base">Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-foreground p-3 bg-muted/50 rounded-lg">{watch.notes}</p>
+              <p className="text-sm text-foreground p-3 bg-muted/50 rounded-lg">{watch.desc}</p>
             </CardContent>
           </Card>
+        )}
+
+        {/* Status and Change Info */}
+        {watch.latest_scan && (
+          <Card className="mb-6 rounded-xl bg-card border border-border animate-fade-in-up modern-hover">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Latest Scan Results</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm font-medium">Status</span>
+                <span className={`text-sm px-2 py-1 rounded ${
+                  watch.status === 'Healthy' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {watch.status}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm font-medium">Changes Detected</span>
+                <span className={`text-sm px-2 py-1 rounded ${
+                  watch.latest_scan.changes ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {watch.latest_scan.changes ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm font-medium">Change Level</span>
+                <span className="text-sm text-foreground">{watch.latest_scan.change_level}</span>
+              </div>
+              {watch.latest_scan.change_summary && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <span className="text-sm font-medium block mb-2">Change Summary</span>
+                  <p className="text-sm text-foreground">{watch.latest_scan.change_summary}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Action Buttons */}
+        {watch.status === 'setup' ? (
+          <div className="flex gap-4 mb-6">
+            <Button 
+              onClick={() => {
+                // TODO: Navigate to configuration/settings
+                console.log('Configure monitoring settings');
+              }}
+              variant="outline"
+              className="flex-1"
+            >
+              Configure Settings
+            </Button>
+            <Button 
+              onClick={() => {
+                // TODO: Actually start monitoring (make API call here)
+                console.log('Start monitoring for:', watch.url);
+              }}
+              className="flex-1"
+            >
+              Start Monitoring
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-4 mb-6">
+            <Button 
+              onClick={() => navigate(`/watch/${watch.id}/timeline`)}
+              variant="outline"
+              className="flex-1"
+            >
+              View Timeline
+            </Button>
+            <Button 
+              onClick={() => navigate(`/watch/${watch.id}/live`)}
+              className="flex-1"
+            >
+              Live View
+            </Button>
+          </div>
         )}
 
         {/* Preview Card */}

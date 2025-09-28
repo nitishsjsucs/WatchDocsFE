@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { getWatches } from '@/lib/storage';
+import { getWatchById } from '@/lib/storage';
+import { getDomainFromUrl } from '@/lib/validation';
 import { WatchItem } from '@/types';
 
 interface TimelineEntry {
@@ -80,19 +81,26 @@ export default function WatchTimeline() {
 
   // Load watch data
   useEffect(() => {
-    if (id) {
-      const watches = getWatches();
-      const foundWatch = watches.find((w: WatchItem) => w.id === id);
-      if (foundWatch) {
-        setWatch(foundWatch);
-        // Select the most recent entry by default
-        if (timelineEntries.length > 0) {
-          setSelectedEntry(timelineEntries[0]);
+    const loadWatch = async () => {
+      if (id) {
+        const numId = parseInt(id, 10);
+        if (!isNaN(numId)) {
+          const foundWatch = await getWatchById(numId);
+          if (foundWatch) {
+            setWatch(foundWatch);
+            // Select the most recent entry by default
+            if (timelineEntries.length > 0) {
+              setSelectedEntry(timelineEntries[0]);
+            }
+          } else {
+            navigate('/');
+          }
+        } else {
+          navigate('/');
         }
-      } else {
-        navigate('/');
       }
-    }
+    };
+    loadWatch();
   }, [id, navigate, timelineEntries]);
 
   const getStatusIcon = (status: string) => {
@@ -172,7 +180,7 @@ export default function WatchTimeline() {
               <div className="w-3 h-3 bg-primary/20 rounded-full flex items-center justify-center">
                 <div className="w-1.5 h-1.5 bg-primary rounded-full" />
               </div>
-              <span className="font-mono text-sm text-muted-foreground">{new URL(watch.url).hostname}</span>
+              <span className="font-mono text-sm text-muted-foreground">{watch?.url ? getDomainFromUrl(watch.url) : 'Loading...'}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -188,7 +196,8 @@ export default function WatchTimeline() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(watch.url, '_blank')}
+              onClick={() => watch?.url && window.open(watch.url, '_blank')}
+              disabled={!watch?.url}
               className="bg-white/90 backdrop-blur-sm hover:bg-white/95"
             >
               <ExternalLink className="h-4 w-4 mr-2" />

@@ -1,41 +1,78 @@
-import { WatchItem } from '@/types';
+import { WatchItem, DocumentsResponse } from '@/types';
 
-const STORAGE_KEY = 'watchdocs:watches';
+const API_BASE_URL = 'http://localhost:8000';
 
-export function getWatches(): WatchItem[] {
+// API service functions
+export async function getWatches(): Promise<WatchItem[]> {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
+    const response = await fetch(`${API_BASE_URL}/documents/`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data: DocumentsResponse = await response.json();
+    return data.documents;
+  } catch (error) {
+    console.error('Failed to fetch watches:', error);
     return [];
   }
 }
 
-export function saveWatches(watches: WatchItem[]): void {
+export async function addWatch(watch: { title: string; url: string; desc?: string }): Promise<WatchItem | null> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(watches));
+    const response = await fetch(`${API_BASE_URL}/documents`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: watch.title,
+        url: watch.url,
+        desc: watch.desc || '',
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
   } catch (error) {
-    console.error('Failed to save watches:', error);
+    console.error('Failed to add watch:', error);
+    return null;
   }
 }
 
-export function addWatch(watch: WatchItem): void {
-  const watches = getWatches();
-  watches.unshift(watch); // Add to beginning
-  saveWatches(watches);
+export async function deleteWatch(id: number): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+      method: 'DELETE',
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Failed to delete watch:', error);
+    return false;
+  }
+}
+
+export async function getWatchById(id: number): Promise<WatchItem | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/${id}/`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch watch:', error);
+    return null;
+  }
+}
+
+// Legacy functions for compatibility - these now just return dummy data or throw errors
+export function saveWatches(watches: WatchItem[]): void {
+  console.warn('saveWatches is deprecated - data is now managed by the API');
 }
 
 export function updateWatch(id: string, updates: Partial<WatchItem>): void {
-  const watches = getWatches();
-  const index = watches.findIndex(w => w.id === id);
-  if (index !== -1) {
-    watches[index] = { ...watches[index], ...updates };
-    saveWatches(watches);
-  }
-}
-
-export function deleteWatch(id: string): void {
-  const watches = getWatches();
-  const filtered = watches.filter(w => w.id !== id);
-  saveWatches(filtered);
+  console.warn('updateWatch is deprecated - use API endpoints directly');
 }

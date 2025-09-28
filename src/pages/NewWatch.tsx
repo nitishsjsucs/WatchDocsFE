@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Play, AlertCircle, CheckCircle, ExternalLink, Link2, ShieldAlert, Clock, Trash2, Plus } from 'lucide-react';
+import { Eye, Play, AlertCircle, CheckCircle, ExternalLink, Link2, ShieldAlert, Clock, Trash2, Plus, Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Shield } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { isHttpUrl, getDomainFromUrl } from '@/lib/validation';
 import { addWatch, getWatches, deleteWatch } from '@/lib/storage';
@@ -24,8 +26,11 @@ export default function NewWatch() {
 
   // Load recent watches
   useEffect(() => {
-    const watches = getWatches();
-    setRecentWatches(watches.slice(0, 6));
+    const loadWatches = async () => {
+      const watches = await getWatches();
+      setRecentWatches(watches.slice(0, 6));
+    };
+    loadWatches();
   }, []);
 
   // Validate URL on change
@@ -53,30 +58,35 @@ export default function NewWatch() {
     }, 1500);
   };
 
-  const handleStartWatching = () => {
+  const handleStartWatching = async () => {
     if (!isHttpUrl(url.trim())) return;
 
-    const newWatch: WatchItem = {
-      id: crypto.randomUUID(),
-      url: url.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    addWatch(newWatch);
-    const domain = getDomainFromUrl(newWatch.url);
-    
+    const domain = getDomainFromUrl(url.trim());
     toast({
-      title: "Now watching",
+      title: "Starting to watch",
       description: domain,
     });
     
-    navigate(`/watch/${newWatch.id}/live`);
+    // Navigate directly to WatchPage with URL as a parameter
+    navigate(`/watch/preview/live?url=${encodeURIComponent(url.trim())}`);
   };
 
-  const handleDeleteWatch = (id: string) => {
-    deleteWatch(id);
-    const watches = getWatches();
-    setRecentWatches(watches.slice(0, 6));
+  const handleDeleteWatch = async (id: number) => {
+    const success = await deleteWatch(id);
+    if (success) {
+      const watches = await getWatches();
+      setRecentWatches(watches.slice(0, 6));
+      toast({
+        title: "Deleted",
+        description: "Watch has been removed",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to delete watch",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -88,6 +98,69 @@ export default function NewWatch() {
     if (diffInHours < 24) return `${diffInHours}h ago`;
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays}d ago`;
+  };
+
+  const getHealthIndicator = (watch: WatchItem) => {
+    const { latest_scan } = watch;
+    if (!latest_scan) {
+      return {
+        icon: <AlertTriangle className="h-4 w-4" />,
+        color: 'text-yellow-500',
+        bgColor: 'bg-yellow-500/10',
+        text: 'No scan',
+        description: 'No scans available yet'
+      };
+    }
+
+    if (latest_scan.changes) {
+      const level = latest_scan.change_level?.toLowerCase();
+      if (level === 'major' || level === 'high') {
+        return {
+          icon: <TrendingUp className="h-4 w-4" />,
+          color: 'text-red-500',
+          bgColor: 'bg-red-500/10',
+          text: 'Major changes',
+          description: latest_scan.change_summary || 'Major changes detected'
+        };
+      } else if (level === 'moderate' || level === 'medium') {
+        return {
+          icon: <Activity className="h-4 w-4" />,
+          color: 'text-orange-500',
+          bgColor: 'bg-orange-500/10',
+          text: 'Moderate changes',
+          description: latest_scan.change_summary || 'Moderate changes detected'
+        };
+      } else {
+        return {
+          icon: <TrendingDown className="h-4 w-4" />,
+          color: 'text-blue-500',
+          bgColor: 'bg-blue-500/10',
+          text: 'Minor changes',
+          description: latest_scan.change_summary || 'Minor changes detected'
+        };
+      }
+    } else {
+      return {
+        icon: <Shield className="h-4 w-4" />,
+        color: 'text-green-500',
+        bgColor: 'bg-green-500/10',
+        text: 'Stable',
+        description: 'No changes detected'
+      };
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'default';
+      case 'paused':
+        return 'secondary';
+      case 'error':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
   };
 
   const getStatusIcon = () => {
@@ -140,7 +213,7 @@ export default function NewWatch() {
       />
       
       {/* Hero Section */}
-      <div className="relative min-h-screen p-4 sm:p-6 lg:p-8 z-10">
+      <div className="relative min-h-[80vh] p-4 sm:p-6 lg:p-8 z-10 flex flex-col justify-center">
         {/* Account Section - Top Right */}
         <div className="absolute top-2 sm:top-3 lg:top-4 right-2 sm:right-3 lg:right-4">
           <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-primary/10 rounded-xl flex items-center justify-center animate-scale-in">
@@ -148,34 +221,56 @@ export default function NewWatch() {
           </div>
         </div>
 
-        {/* Main Content - Responsive Layout */}
-        <div className="flex flex-col lg:flex-row items-center justify-center min-h-screen gap-8 lg:gap-12">
-          {/* Left Section - Form */}
-          <div className={`text-center w-full max-w-lg lg:max-w-xl animate-fade-in-up transition-all duration-500 ${url.trim() ? 'lg:max-w-md' : ''}`}>
-            <div className="mb-8 sm:mb-12">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-3 sm:mb-4">Watch Docs</h1>
-              <p className="text-muted-foreground text-base sm:text-lg lg:text-xl leading-relaxed">
-                Track changes on any web page.
-              </p>
+        {/* Professional Header Section */}
+        <div className="text-center mb-16 animate-fade-in-up">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text">
+            Watch Docs
+          </h1>
+          <p className="text-muted-foreground text-lg sm:text-xl lg:text-2xl leading-relaxed max-w-2xl mx-auto mb-4">
+            Monitor web page changes with intelligent tracking and real-time notifications.
+          </p>
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span>Real-time monitoring</span>
             </div>
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-blue-500" />
+              <span>Secure scanning</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-orange-500" />
+              <span>Change detection</span>
+            </div>
+          </div>
+        </div>
 
-            {/* URL Input */}
-            <div className="space-y-4 sm:space-y-6 mb-8 sm:mb-10">
-              <div className="relative">
-                <Link2 className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+        {/* Main Content - Responsive Layout */}
+        <div className="flex flex-col lg:flex-row items-start justify-center gap-12 lg:gap-16 max-w-7xl mx-auto w-full">
+          {/* Left Section - Form */}
+          <div className={`w-full animate-fade-in-up transition-all duration-500 ${url.trim() ? 'lg:max-w-2xl' : 'lg:max-w-3xl mx-auto text-center'}`}>
+            {/* URL Input Section */}
+            <div className="space-y-6 mb-12">
+              <div className="relative max-w-4xl mx-auto">
+                <Link2 className="absolute left-6 top-1/2 transform -translate-y-1/2 h-6 w-6 text-muted-foreground z-10" />
                  <Input
                    id="url"
                    type="url"
-                   placeholder="https://example.com"
+                   placeholder="Enter any website URL (e.g., https://docs.example.com, https://news.site.com)"
                    value={url}
                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)}
-                   className={`pl-12 sm:pl-14 h-14 sm:h-16 lg:h-18 text-base sm:text-lg lg:text-xl bg-white/90 backdrop-blur-sm ${urlError ? 'border-destructive focus-visible:ring-destructive' : 'focus-visible:ring-primary'}`}
+                   className={`pl-16 pr-6 h-16 sm:h-18 lg:h-20 text-lg sm:text-xl lg:text-2xl bg-white/95 backdrop-blur-sm border-2 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl focus:shadow-2xl placeholder:text-muted-foreground/50 ${urlError ? 'border-destructive focus-visible:ring-destructive' : 'border-border focus-visible:ring-primary focus:border-primary/50'}`}
                    aria-describedby={urlError ? 'url-error' : undefined}
                    aria-invalid={!!urlError}
                  />
+                 {url.trim() && (
+                   <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
+                     {getStatusIcon()}
+                   </div>
+                 )}
               </div>
               {urlError && (
-                <Alert variant="destructive" className="animate-slide-down">
+                <Alert variant="destructive" className="animate-slide-down max-w-4xl mx-auto">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription id="url-error">
                     {urlError}
@@ -185,64 +280,73 @@ export default function NewWatch() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-4 sm:gap-6 mb-8 sm:mb-10">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-12 max-w-2xl mx-auto">
                <Button
                  onClick={handlePreview}
                  disabled={!isHttpUrl(url.trim()) || isLoading}
                  variant="outline"
                  size="lg"
-                 className="flex-1 h-14 sm:h-16 lg:h-18 text-base sm:text-lg bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                 className="flex-1 h-16 sm:h-18 text-lg font-medium bg-white/95 backdrop-blur-sm hover:bg-white border-2 hover:border-primary/30 transition-all duration-300 hover:shadow-lg"
                >
-                 <Eye className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
-                 Preview
+                 <Eye className="h-5 w-5 mr-3" />
+                 Preview Website
                </Button>
                <Button
                  onClick={handleStartWatching}
                  disabled={!isHttpUrl(url.trim())}
-                 variant="outline"
                  size="lg"
-                 className="flex-1 h-14 sm:h-16 lg:h-18 text-base sm:text-lg bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                 className="flex-1 h-16 sm:h-18 text-lg font-medium bg-black hover:bg-black/90 text-white transition-all duration-300 hover:shadow-lg hover:scale-105"
                >
-                 <Play className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
-                 Start Watching
+                 <Play className="h-5 w-5 mr-3" />
+                 Start Monitoring
                </Button>
             </div>
 
-              {/* Fine print */}
-              <p className="text-sm sm:text-base text-muted-foreground text-center">
-                We sandbox the preview; some sites block embedding.
+            {/* Status and Help Text */}
+            <div className="space-y-4 text-center">
+              {url.trim() && (
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  {getStatusIcon()}
+                  <span className={`font-medium ${previewStatus === 'valid' ? 'text-green-600' : previewStatus === 'invalid' ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {getStatusText()} URL
+                  </span>
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+                Enter any website URL to start monitoring. We'll track changes and notify you when content updates.
               </p>
             </div>
+          </div>
 
           {/* Right Section - Preview */}
           {url.trim() && (
-            <div className={`w-full max-w-3xl lg:max-w-2xl animate-slide-in-right transition-all duration-[1200ms] ${url.trim() ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'}`}>
-              <Card className="rounded-2xl bg-white/90 backdrop-blur-sm border border-border modern-hover">
-                <CardHeader className="pb-4 sm:pb-6">
+            <div className="w-full lg:max-w-3xl animate-slide-in-right transition-all duration-700">
+              <Card className="rounded-3xl bg-white/95 backdrop-blur-sm border-2 border-border shadow-xl modern-hover">
+                <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-4 h-4 sm:w-5 sm:h-5 bg-primary/20 rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-primary rounded-full" />
+                      <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center">
+                        <div className="w-2.5 h-2.5 bg-primary rounded-full" />
                       </div>
-                      <span className="font-mono text-sm sm:text-base text-muted-foreground">{getDomainFromUrl(url)}</span>
+                      <span className="font-mono text-base text-muted-foreground">{getDomainFromUrl(url)}</span>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => window.open(url, '_blank')}
-                      className="h-8 w-8 sm:h-10 sm:w-10 p-0"
+                      className="h-10 w-10 p-0 rounded-xl hover:bg-muted/50"
                     >
-                      <ExternalLink className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <ExternalLink className="h-5 w-5" />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="border rounded-xl overflow-hidden aspect-video bg-muted/20">
+                  <div className="border-2 rounded-2xl overflow-hidden aspect-video bg-muted/10 shadow-inner">
                     {isLoading ? (
-                      <div className="p-6 sm:p-8 space-y-4 h-full flex flex-col justify-center">
+                      <div className="p-8 space-y-4 h-full flex flex-col justify-center">
                         <Skeleton className="h-4 w-3/4 mx-auto" />
                         <Skeleton className="h-4 w-1/2 mx-auto" />
-                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-32 w-full rounded-xl" />
                       </div>
                     ) : previewStatus === 'valid' ? (
                       <iframe
@@ -253,9 +357,9 @@ export default function NewWatch() {
                         onError={() => setPreviewStatus('blocked')}
                       />
                     ) : (
-                      <div className="p-8 sm:p-12 text-center text-muted-foreground h-full flex flex-col items-center justify-center">
-                        <ShieldAlert className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 sm:mb-6 opacity-50" />
-                        <p className="mb-4 sm:mb-6 text-sm sm:text-base">
+                      <div className="p-12 text-center text-muted-foreground h-full flex flex-col items-center justify-center">
+                        <ShieldAlert className="h-20 w-20 mx-auto mb-6 opacity-40" />
+                        <p className="mb-6 text-base">
                           {previewStatus === 'invalid' 
                             ? 'Enter a valid URL to see the preview'
                             : 'Preview blocked by website security policy'
@@ -263,11 +367,11 @@ export default function NewWatch() {
                         </p>
                          <Button
                            variant="outline"
-                           size="sm"
+                           size="lg"
                            onClick={() => window.open(url, '_blank')}
-                           className="bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                           className="bg-white/95 backdrop-blur-sm hover:bg-white border-2 hover:border-primary/30 transition-all duration-300"
                          >
-                           <ExternalLink className="h-4 w-4 mr-2" />
+                           <ExternalLink className="h-5 w-5 mr-2" />
                            Open in new tab
                          </Button>
                       </div>
@@ -280,110 +384,230 @@ export default function NewWatch() {
         </div>
       </div>
 
-
-      {/* Recent Watch Docs Section */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 relative z-10">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-6 sm:mb-8">
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-foreground">Recent Watch Docs</h2>
-             <Button variant="outline" size="sm" className="text-xs sm:text-sm bg-white/90 backdrop-blur-sm hover:bg-white/95">
-               View Dashboard
-             </Button>
+      {/* Recent Watch Docs Section - Moved higher and improved */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 relative z-10">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Your Watch Dashboard</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Monitor all your tracked websites in one place. Get instant notifications when content changes.
+            </p>
           </div>
 
           {recentWatches.length === 0 ? (
-             <Card className="rounded-2xl bg-white/90 backdrop-blur-sm border border-border animate-fade-in-up">
-              <CardContent className="p-8 sm:p-12 text-center">
-                <Plus className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 sm:mb-6 text-muted-foreground" />
-                <h3 className="text-lg sm:text-xl font-medium mb-3 sm:mb-4 text-foreground">No watches yet</h3>
-                <p className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8">
-                  Create your first watch to start tracking changes on web pages.
+             <Card className="rounded-3xl bg-white/95 backdrop-blur-sm border-2 border-border animate-fade-in-up shadow-lg">
+              <CardContent className="p-12 text-center">
+                <div className="w-24 h-24 mx-auto mb-6 bg-primary/5 rounded-full flex items-center justify-center">
+                  <Plus className="h-12 w-12 text-primary/60" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4 text-foreground">Ready to start monitoring?</h3>
+                <p className="text-muted-foreground text-lg mb-8 max-w-md mx-auto">
+                  Add your first website above to begin tracking changes with intelligent notifications and detailed analysis.
                 </p>
                  <Button 
                    size="lg"
                    onClick={() => document.getElementById('url')?.focus()}
-                   className="bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                   className="bg-primary hover:bg-primary/90 text-primary-foreground h-12 px-8 rounded-xl font-medium transition-all duration-300 hover:scale-105"
                  >
-                   <Plus className="h-4 w-4 mr-2" />
-                   Create your first watch
+                   <Plus className="h-5 w-5 mr-2" />
+                   Get started now
                  </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {recentWatches.map((watch, index) => (
-                 <Card 
-                   key={watch.id} 
-                   className="rounded-2xl bg-white/90 backdrop-blur-sm border border-border animate-fade-in-up modern-hover cursor-pointer transition-all duration-200 hover:scale-105"
-                   style={{ animationDelay: `${index * 0.1}s` }}
-                   onClick={() => navigate(`/watch/${watch.id}/timeline`)}
-                 >
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-4 h-4 sm:w-5 sm:h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
-                          <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-primary rounded-full" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm sm:text-base truncate text-foreground">{getDomainFromUrl(watch.url)}</p>
-                          <p className="text-xs sm:text-sm text-muted-foreground truncate">{watch.url}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                          {formatTimeAgo(watch.createdAt)}
-                        </div>
+            <>
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-xl font-semibold text-foreground">Active Monitors</h3>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-0 font-medium">
+                    {recentWatches.length} {recentWatches.length === 1 ? 'site' : 'sites'}
+                  </Badge>
+                </div>
+                <Button variant="outline" className="bg-white/95 backdrop-blur-sm hover:bg-white border-2 hover:border-primary/30 transition-all duration-300">
+                  <Activity className="h-4 w-4 mr-2" />
+                  View All
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recentWatches.map((watch, index) => {
+                const healthIndicator = getHealthIndicator(watch);
+                return (
+                  <TooltipProvider key={watch.id}>
+                    <Card 
+                      className="rounded-3xl bg-white/95 backdrop-blur-sm border-2 border-border animate-fade-in-up modern-hover cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl overflow-hidden"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                      onClick={() => navigate(`/watch/${watch.id}/timeline`)}
+                    >
+                      {/* Website Preview */}
+                      <div className="relative h-32 bg-muted/20 overflow-hidden">
+                        <iframe
+                          src={watch.url}
+                          className="w-full h-full transform scale-75 origin-top-left pointer-events-none"
+                          sandbox="allow-same-origin"
+                          title={`Preview of ${watch.title || getDomainFromUrl(watch.url)}`}
+                          style={{
+                            width: '133.33%',
+                            height: '133.33%',
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                         
-                        <div className="flex items-center gap-1">
-                           <Button
-                             variant="ghost"
-                             size="sm"
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               navigate(`/watch/${watch.id}/live`);
-                             }}
-                             className="h-8 px-2 text-xs sm:text-sm bg-white/90 backdrop-blur-sm hover:bg-white/95"
-                           >
-                             Live
-                           </Button>
+                        {/* Status Badge */}
+                        <div className="absolute top-2 left-2">
+                          <Badge 
+                            variant={getStatusBadgeVariant(watch.status)}
+                            className="text-xs bg-white/90 backdrop-blur-sm"
+                          >
+                            {watch.status || 'Active'}
+                          </Badge>
+                        </div>
+
+                        {/* Health Indicator */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className={`absolute top-2 right-2 ${healthIndicator.bgColor} ${healthIndicator.color} p-2 rounded-full backdrop-blur-sm`}>
+                              {healthIndicator.icon}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-medium">{healthIndicator.text}</p>
+                            <p className="text-xs text-muted-foreground">{healthIndicator.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+
+                      <CardContent className="p-6 space-y-4">
+                        {/* Title and URL */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-primary rounded-full flex-shrink-0" />
+                            <h3 className="font-semibold text-base truncate text-foreground">
+                              {watch.title || getDomainFromUrl(watch.url)}
+                            </h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate pl-5">
+                            {getDomainFromUrl(watch.url)}
+                          </p>
+                        </div>
+
+                        {/* Health Status */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${healthIndicator.color.replace('text-', 'bg-')}`} />
+                            <span className="text-sm font-medium">{healthIndicator.text}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {watch.latest_scan ? formatTimeAgo(watch.latest_scan.scan_date) : formatTimeAgo(watch.created_date)}
+                          </div>
+                        </div>
+
+                        {/* Change Summary */}
+                        {watch.latest_scan?.change_summary && (
+                          <div className="text-xs text-muted-foreground pl-4 border-l-2 border-muted overflow-hidden">
+                            <div 
+                              className="line-clamp-2"
+                              style={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {watch.latest_scan.change_summary}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center justify-between pt-2">
+                          <div className="flex gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/watch/${watch.id}/live`);
+                                  }}
+                                  className="h-8 px-3 text-xs bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Live
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>View live monitoring</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(watch.url, '_blank');
+                                  }}
+                                  className="h-8 w-8 p-0 bg-white/90 backdrop-blur-sm hover:bg-white/95"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Open website</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => e.stopPropagation()}
-                                className="h-8 w-8 sm:h-10 sm:w-10 p-0 text-destructive hover:text-destructive bg-white/90 backdrop-blur-sm hover:bg-white/95"
-                              >
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                             <AlertDialogContent className="bg-white/90 backdrop-blur-sm">
-                               <AlertDialogHeader>
-                                 <AlertDialogTitle>Delete Watch</AlertDialogTitle>
-                                 <AlertDialogDescription>
-                                   Are you sure you want to delete this watch? This action cannot be undone.
-                                 </AlertDialogDescription>
-                               </AlertDialogHeader>
-                               <AlertDialogFooter>
-                                 <AlertDialogCancel className="bg-white/90 backdrop-blur-sm hover:bg-white/95">Cancel</AlertDialogCancel>
-                                 <AlertDialogAction
-                                   onClick={() => handleDeleteWatch(watch.id)}
-                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                 >
-                                   Delete
-                                 </AlertDialogAction>
-                               </AlertDialogFooter>
-                             </AlertDialogContent>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive bg-white/90 backdrop-blur-sm hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Delete watch</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            
+                            <AlertDialogContent className="bg-white/90 backdrop-blur-sm">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Watch</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{watch.title || getDomainFromUrl(watch.url)}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="bg-white/90 backdrop-blur-sm hover:bg-white/95">Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteWatch(watch.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
                           </AlertDialog>
                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </CardContent>
+                    </Card>
+                  </TooltipProvider>
+                );
+              })}
             </div>
+            </>
           )}
         </div>
       </div>
