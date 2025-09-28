@@ -2,9 +2,12 @@ export type LatestScan = {
   id: number;
   changes: boolean;
   change_level: string;
-  change_summary: string;
+  change_summary: string | null;
   current_summary: string;
   scan_date: string;
+  additions: string[];
+  deletions: string[];
+  modifications: string[];
 };
 
 export type ScanHistory = {
@@ -12,14 +15,12 @@ export type ScanHistory = {
   date: string;
   changes: boolean;
   change_level: string;
-  change_summary: string;
+  change_summary: string | null;
   current_summary: string;
   raw_content_preview?: string;
-  changes_detail: {
-    added: string[];
-    removed: string[];
-    modified: string[];
-  };
+  additions: string[];
+  deletions: string[];
+  modifications: string[];
 };
 
 export type WatchTimelineResponse = {

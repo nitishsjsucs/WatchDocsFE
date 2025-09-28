@@ -10,7 +10,8 @@ import {
   Calendar,
   Diff,
   Plus,
-  Minus
+  Minus,
+  Mic
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,7 +108,7 @@ export default function WatchTimeline() {
 
   const getEntryDescription = (entry: ScanHistory) => {
     if (entry.changes) {
-      return entry.change_summary.substring(0, 100) + (entry.change_summary.length > 100 ? '...' : '');
+      return entry.change_summary?.substring(0, 100) + (entry.change_summary && entry.change_summary.length > 100 ? '...' : '') || 'Changes detected';
     } else {
       return 'No changes detected in this scan';
     }
@@ -186,6 +187,18 @@ export default function WatchTimeline() {
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               Visit Site
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                // TODO: Add microphone functionality
+                console.log('Microphone clicked');
+              }}
+              className="bg-white/90 backdrop-blur-sm hover:bg-white/95"
+            >
+              <Mic className="h-4 w-4 mr-2" />
+              Voice
             </Button>
           </div>
         </div>
@@ -355,17 +368,17 @@ export default function WatchTimeline() {
                     </CardHeader>
                     <CardContent className="pt-0">
                       <ScrollArea className="h-[calc(100%-60px)]">
-                        {selectedEntry.changes && selectedEntry.changes_detail ? (
+                        {selectedEntry.changes && (selectedEntry.additions?.length > 0 || selectedEntry.deletions?.length > 0 || selectedEntry.modifications?.length > 0) ? (
                           <div className="space-y-4">
                             {/* Added Items */}
-                            {selectedEntry.changes_detail.added.length > 0 && (
+                            {selectedEntry.additions && selectedEntry.additions.length > 0 && (
                               <div>
                                 <h4 className="text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
                                   <Plus className="h-3 w-3" />
-                                  Added ({selectedEntry.changes_detail.added.length})
+                                  Added ({selectedEntry.additions.length})
                                 </h4>
                                 <div className="space-y-1">
-                                  {selectedEntry.changes_detail.added.map((item, index) => (
+                                  {selectedEntry.additions.map((item, index) => (
                                     <div key={index} className="text-xs p-2 bg-green-50 border-l-2 border-green-500 rounded">
                                       {item}
                                     </div>
@@ -375,14 +388,14 @@ export default function WatchTimeline() {
                             )}
 
                             {/* Removed Items */}
-                            {selectedEntry.changes_detail.removed.length > 0 && (
+                            {selectedEntry.deletions && selectedEntry.deletions.length > 0 && (
                               <div>
                                 <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1">
                                   <Minus className="h-3 w-3" />
-                                  Removed ({selectedEntry.changes_detail.removed.length})
+                                  Removed ({selectedEntry.deletions.length})
                                 </h4>
                                 <div className="space-y-1">
-                                  {selectedEntry.changes_detail.removed.map((item, index) => (
+                                  {selectedEntry.deletions.map((item, index) => (
                                     <div key={index} className="text-xs p-2 bg-red-50 border-l-2 border-red-500 rounded">
                                       {item}
                                     </div>
@@ -392,14 +405,14 @@ export default function WatchTimeline() {
                             )}
 
                             {/* Modified Items */}
-                            {selectedEntry.changes_detail.modified.length > 0 && (
+                            {selectedEntry.modifications && selectedEntry.modifications.length > 0 && (
                               <div>
                                 <h4 className="text-sm font-medium text-blue-700 mb-2 flex items-center gap-1">
                                   <Diff className="h-3 w-3" />
-                                  Modified ({selectedEntry.changes_detail.modified.length})
+                                  Modified ({selectedEntry.modifications.length})
                                 </h4>
                                 <div className="space-y-1">
-                                  {selectedEntry.changes_detail.modified.map((item, index) => (
+                                  {selectedEntry.modifications.map((item, index) => (
                                     <div key={index} className="text-xs p-2 bg-blue-50 border-l-2 border-blue-500 rounded">
                                       {item}
                                     </div>
@@ -409,12 +422,14 @@ export default function WatchTimeline() {
                             )}
                             
                             {/* Change Summary */}
-                            <div className="mt-4 p-3 bg-muted/10 rounded-lg">
-                              <h4 className="text-sm font-medium mb-2">Change Summary</h4>
-                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                {selectedEntry.change_summary}
-                              </p>
-                            </div>
+                            {selectedEntry.change_summary && (
+                              <div className="mt-4 p-3 bg-muted/10 rounded-lg">
+                                <h4 className="text-sm font-medium mb-2">Change Summary</h4>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  {selectedEntry.change_summary}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="text-center py-8">
@@ -426,7 +441,7 @@ export default function WatchTimeline() {
                             </p>
                             {selectedEntry.change_summary && (
                               <div className="mt-4 p-3 bg-muted/10 rounded-lg text-left">
-                                <h4 className="text-sm font-medium mb-2">Change Summary</h4>
+                                <h4 className="text-sm font-medium mb-2">Summary</h4>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
                                   {selectedEntry.change_summary}
                                 </p>
